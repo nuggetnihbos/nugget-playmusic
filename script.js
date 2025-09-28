@@ -179,12 +179,17 @@ async function searchLyrics(title, artist) {
     lyricsSection.classList.add('active');
     
     try {
-        const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`);
+        const query = `${artist} ${title}`;
+        const response = await fetch(`https://rullz-api-sigma.vercel.app/search/lyrics?q=${encodeURIComponent(query)}`);
         if (!response.ok) throw new Error('Lirik tidak ditemukan');
         
         const data = await response.json();
-        displayLyrics(data.lyrics);
-        showNotification('Lirik berhasil ditemukan');
+        if (data.status && data.result && data.result.lyrics) {
+            displayLyrics(data.result.lyrics);
+            showNotification('Lirik berhasil ditemukan');
+        } else {
+            throw new Error('Lirik tidak ditemukan');
+        }
     } catch (err) {
         lyricsContent.innerHTML = '<p>Lirik tidak ditemukan untuk lagu ini.</p>';
     }
