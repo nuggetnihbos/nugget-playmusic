@@ -1,4 +1,4 @@
-const searchInput = document.getElementById('searchInput');
+    const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const loading = document.getElementById('loading');
 const error = document.getElementById('error');
@@ -37,6 +37,8 @@ let isPlaying = false;
 let currentTrack = null;
 let audioEventsInitialized = false;
 let isDarkTheme = true;
+let currentLyrics = [];
+let lyricsTimings = [];
 
 shareUrl.value = window.location.href;
 
@@ -177,6 +179,8 @@ function displayResult(result) {
 async function searchLyrics(title, artist) {
     lyricsContent.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Mencari lirik...</p>';
     lyricsSection.classList.add('active');
+    currentLyrics = [];
+    lyricsTimings = [];
     
     try {
         const query = `${artist} ${title}`;
@@ -185,7 +189,7 @@ async function searchLyrics(title, artist) {
         
         const data = await response.json();
         if (data.status && data.result && data.result.lyrics) {
-            displayLyrics(data.result.lyrics);
+            processLyrics(data.result.lyrics);
             showNotification('Lirik berhasil ditemukan');
         } else {
             throw new Error('Lirik tidak ditemukan');
@@ -195,11 +199,47 @@ async function searchLyrics(title, artist) {
     }
 }
 
-function displayLyrics(lyrics) {
+function processLyrics(lyrics) {
     const lines = lyrics.split('\n').filter(line => line.trim());
-    lyricsContent.innerHTML = lines.map(line => 
-        `<div class="lyrics-line">${line}</div>`
+    currentLyrics = lines;
+    
+    lyricsContent.innerHTML = lines.map((line, index) => 
+        `<div class="lyrics-line" data-index="${index}">${line}</div>`
     ).join('');
+    
+    lyricsTimings = calculateLyricsTimings(lines.length, audio.duration || 180);
+}
+
+function calculateLyricsTimings(totalLines, duration) {
+    const timings = [];
+    const interval = duration / totalLines;
+    
+    for (let i = 0; i < totalLines; i++) {
+        timings.push(i * interval);
+    }
+    
+    return timings;
+}
+
+function updateLyricsHighlight(currentTime) {
+    const lyricsLines = document.querySelectorAll('.lyrics-line');
+    
+    lyricsLines.forEach(line => line.classList.remove('active'));
+    
+    for (let i = lyricsTimings.length - 1; i >= 0; i--) {
+        if (currentTime >= lyricsTimings[i]) {
+            const activeLine = document.querySelector(`.lyrics-line[data-index="${i}"]`);
+            if (activeLine) {
+                activeLine.classList.add('active');
+                
+                if (activeLine.offsetTop < lyricsContent.scrollTop || 
+                    activeLine.offsetTop > lyricsContent.scrollTop + lyricsContent.clientHeight - 50) {
+                    activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+            break;
+        }
+    }
 }
 
 function playMusic(src, title, channel, image) {
@@ -227,6 +267,9 @@ function playMusic(src, title, channel, image) {
 
 function updateDuration() {
     durationEl.textContent = formatTime(audio.duration);
+    if (currentLyrics.length > 0) {
+        lyricsTimings = calculateLyricsTimings(currentLyrics.length, audio.duration);
+    }
 }
 
 function handleAudioEnd() {
@@ -234,6 +277,10 @@ function handleAudioEnd() {
     updatePlayPauseButton();
     progress.style.width = '0%';
     currentTimeEl.textContent = '0:00';
+    
+    const lyricsLines = document.querySelectorAll('.lyrics-line');
+    lyricsLines.forEach(line => line.classList.remove('active'));
+    
     showNotification('Lagu selesai diputar');
 }
 
@@ -250,11 +297,8 @@ function updateProgress() {
         progress.style.width = `${progressPercent}%`;
         currentTimeEl.textContent = formatTime(audio.currentTime);
         
-        const lyricsLines = document.querySelectorAll('.lyrics-line');
-        if (lyricsLines.length > 0) {
-            lyricsLines.forEach((line, index) => {
-                line.classList.toggle('active', index === Math.floor(progressPercent / 100 * lyricsLines.length));
-            });
+        if (currentLyrics.length > 0) {
+            updateLyricsHighlight(audio.currentTime);
         }
     }
 }
@@ -362,6 +406,9 @@ nextBtn.addEventListener('click', function() {
     updatePlayPauseButton();
     progress.style.width = '0%';
     currentTimeEl.textContent = '0:00';
+    
+    const lyricsLines = document.querySelectorAll('.lyrics-line');
+    lyricsLines.forEach(line => line.classList.remove('active'));
 });
 
 progressBar.addEventListener('click', function(e) {
