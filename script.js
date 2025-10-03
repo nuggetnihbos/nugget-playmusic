@@ -104,7 +104,7 @@ async function searchMusic(query) {
     
     try {
         const encodedQuery = encodeURIComponent(query);
-        const apiUrl = `https://api.deline.my.id/downloader/ytplay?q=${encodedQuery}`;
+        const apiUrl = `https://rullz-api-sigma.vercel.app/search/play?q=${encodedQuery}`;
         
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Network response was not ok');
@@ -130,29 +130,29 @@ function displayResult(result) {
     resultsSection.innerHTML = `
         <div class="result-card">
             <div class="thumbnail">
-                <img src="${result.thumbnail}" alt="${result.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+                <img src="${result.imageUrl}" alt="${result.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
             </div>
             <div class="result-info">
                 <h3>${result.title}</h3>
                 <div class="result-meta">
                     <div class="meta-item">
                         <i class="fas fa-user"></i>
-                        <span>YouTube</span>
+                        <span>${result.channel}</span>
                     </div>
                     <div class="meta-item">
-                        <i class="fas fa-file-audio"></i>
-                        <span>${result.audio ? result.audio.quality : 'Audio'}</span>
+                        <i class="fas fa-clock"></i>
+                        <span>${result.duration}</span>
                     </div>
                     <div class="meta-item">
-                        <i class="fas fa-hdd"></i>
-                        <span>${result.audio ? result.audio.filesize : ''}</span>
+                        <i class="fas fa-eye"></i>
+                        <span>${result.views.toLocaleString()} views</span>
                     </div>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-primary play-btn" data-src="${result.audio ? result.audio.download : ''}" data-title="${result.title}" data-channel="YouTube" data-image="${result.thumbnail}">
+                    <button class="btn btn-primary play-btn" data-src="${result.mp3}" data-title="${result.title}" data-channel="${result.channel}" data-image="${result.imageUrl}">
                         <i class="fas fa-play"></i> Putar
                     </button>
-                    <button class="btn btn-secondary lyrics-btn" data-title="${result.title}" data-artist="YouTube">
+                    <button class="btn btn-secondary lyrics-btn" data-title="${result.title}" data-artist="${result.channel}">
                         <i class="fas fa-scroll"></i> Lirik
                     </button>
                 </div>
@@ -179,12 +179,17 @@ async function searchLyrics(title, artist) {
     lyricsSection.classList.add('active');
     
     try {
-        const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`);
+        const query = `${artist} ${title}`;
+        const response = await fetch(`https://rullz-api-sigma.vercel.app/search/lyrics?q=${encodeURIComponent(query)}`);
         if (!response.ok) throw new Error('Lirik tidak ditemukan');
         
         const data = await response.json();
-        displayLyrics(data.lyrics);
-        showNotification('Lirik berhasil ditemukan');
+        if (data.status && data.result && data.result.lyrics) {
+            displayLyrics(data.result.lyrics);
+            showNotification('Lirik berhasil ditemukan');
+        } else {
+            throw new Error('Lirik tidak ditemukan');
+        }
     } catch (err) {
         lyricsContent.innerHTML = '<p>Lirik tidak ditemukan untuk lagu ini.</p>';
     }
