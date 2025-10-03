@@ -1,4 +1,4 @@
-    const searchInput = document.getElementById('searchInput');
+const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const loading = document.getElementById('loading');
 const error = document.getElementById('error');
@@ -37,8 +37,6 @@ let isPlaying = false;
 let currentTrack = null;
 let audioEventsInitialized = false;
 let isDarkTheme = true;
-let currentLyrics = [];
-let lyricsTimings = [];
 
 shareUrl.value = window.location.href;
 
@@ -106,7 +104,7 @@ async function searchMusic(query) {
     
     try {
         const encodedQuery = encodeURIComponent(query);
-        const apiUrl = `https://rullz-api-sigma.vercel.app/search/play?q=${encodedQuery}`;
+        const apiUrl = `https://api.deline.my.id/downloader/ytplay?q=${encodedQuery}`;
         
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Network response was not ok');
@@ -132,29 +130,29 @@ function displayResult(result) {
     resultsSection.innerHTML = `
         <div class="result-card">
             <div class="thumbnail">
-                <img src="${result.imageUrl}" alt="${result.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+                <img src="${result.thumbnail}" alt="${result.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
             </div>
             <div class="result-info">
                 <h3>${result.title}</h3>
                 <div class="result-meta">
                     <div class="meta-item">
                         <i class="fas fa-user"></i>
-                        <span>${result.channel}</span>
+                        <span>YouTube</span>
                     </div>
                     <div class="meta-item">
-                        <i class="fas fa-clock"></i>
-                        <span>${result.duration}</span>
+                        <i class="fas fa-file-audio"></i>
+                        <span>${result.audio ? result.audio.quality : 'Audio'}</span>
                     </div>
                     <div class="meta-item">
-                        <i class="fas fa-eye"></i>
-                        <span>${result.views.toLocaleString()} views</span>
+                        <i class="fas fa-hdd"></i>
+                        <span>${result.audio ? result.audio.filesize : ''}</span>
                     </div>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-primary play-btn" data-src="${result.mp3}" data-title="${result.title}" data-channel="${result.channel}" data-image="${result.imageUrl}">
+                    <button class="btn btn-primary play-btn" data-src="${result.audio ? result.audio.download : ''}" data-title="${result.title}" data-channel="YouTube" data-image="${result.thumbnail}">
                         <i class="fas fa-play"></i> Putar
                     </button>
-                    <button class="btn btn-secondary lyrics-btn" data-title="${result.title}" data-artist="${result.channel}">
+                    <button class="btn btn-secondary lyrics-btn" data-title="${result.title}" data-artist="YouTube">
                         <i class="fas fa-scroll"></i> Lirik
                     </button>
                 </div>
@@ -179,67 +177,24 @@ function displayResult(result) {
 async function searchLyrics(title, artist) {
     lyricsContent.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Mencari lirik...</p>';
     lyricsSection.classList.add('active');
-    currentLyrics = [];
-    lyricsTimings = [];
     
     try {
-        const query = `${artist} ${title}`;
-        const response = await fetch(`https://rullz-api-sigma.vercel.app/search/lyrics?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`);
         if (!response.ok) throw new Error('Lirik tidak ditemukan');
         
         const data = await response.json();
-        if (data.status && data.result && data.result.lyrics) {
-            processLyrics(data.result.lyrics);
-            showNotification('Lirik berhasil ditemukan');
-        } else {
-            throw new Error('Lirik tidak ditemukan');
-        }
+        displayLyrics(data.lyrics);
+        showNotification('Lirik berhasil ditemukan');
     } catch (err) {
         lyricsContent.innerHTML = '<p>Lirik tidak ditemukan untuk lagu ini.</p>';
     }
 }
 
-function processLyrics(lyrics) {
+function displayLyrics(lyrics) {
     const lines = lyrics.split('\n').filter(line => line.trim());
-    currentLyrics = lines;
-    
-    lyricsContent.innerHTML = lines.map((line, index) => 
-        `<div class="lyrics-line" data-index="${index}">${line}</div>`
+    lyricsContent.innerHTML = lines.map(line => 
+        `<div class="lyrics-line">${line}</div>`
     ).join('');
-    
-    lyricsTimings = calculateLyricsTimings(lines.length, audio.duration || 180);
-}
-
-function calculateLyricsTimings(totalLines, duration) {
-    const timings = [];
-    const interval = duration / totalLines;
-    
-    for (let i = 0; i < totalLines; i++) {
-        timings.push(i * interval);
-    }
-    
-    return timings;
-}
-
-function updateLyricsHighlight(currentTime) {
-    const lyricsLines = document.querySelectorAll('.lyrics-line');
-    
-    lyricsLines.forEach(line => line.classList.remove('active'));
-    
-    for (let i = lyricsTimings.length - 1; i >= 0; i--) {
-        if (currentTime >= lyricsTimings[i]) {
-            const activeLine = document.querySelector(`.lyrics-line[data-index="${i}"]`);
-            if (activeLine) {
-                activeLine.classList.add('active');
-                
-                if (activeLine.offsetTop < lyricsContent.scrollTop || 
-                    activeLine.offsetTop > lyricsContent.scrollTop + lyricsContent.clientHeight - 50) {
-                    activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            }
-            break;
-        }
-    }
 }
 
 function playMusic(src, title, channel, image) {
@@ -267,9 +222,6 @@ function playMusic(src, title, channel, image) {
 
 function updateDuration() {
     durationEl.textContent = formatTime(audio.duration);
-    if (currentLyrics.length > 0) {
-        lyricsTimings = calculateLyricsTimings(currentLyrics.length, audio.duration);
-    }
 }
 
 function handleAudioEnd() {
@@ -277,10 +229,6 @@ function handleAudioEnd() {
     updatePlayPauseButton();
     progress.style.width = '0%';
     currentTimeEl.textContent = '0:00';
-    
-    const lyricsLines = document.querySelectorAll('.lyrics-line');
-    lyricsLines.forEach(line => line.classList.remove('active'));
-    
     showNotification('Lagu selesai diputar');
 }
 
@@ -297,8 +245,11 @@ function updateProgress() {
         progress.style.width = `${progressPercent}%`;
         currentTimeEl.textContent = formatTime(audio.currentTime);
         
-        if (currentLyrics.length > 0) {
-            updateLyricsHighlight(audio.currentTime);
+        const lyricsLines = document.querySelectorAll('.lyrics-line');
+        if (lyricsLines.length > 0) {
+            lyricsLines.forEach((line, index) => {
+                line.classList.toggle('active', index === Math.floor(progressPercent / 100 * lyricsLines.length));
+            });
         }
     }
 }
@@ -406,9 +357,6 @@ nextBtn.addEventListener('click', function() {
     updatePlayPauseButton();
     progress.style.width = '0%';
     currentTimeEl.textContent = '0:00';
-    
-    const lyricsLines = document.querySelectorAll('.lyrics-line');
-    lyricsLines.forEach(line => line.classList.remove('active'));
 });
 
 progressBar.addEventListener('click', function(e) {
