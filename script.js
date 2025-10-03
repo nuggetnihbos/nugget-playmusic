@@ -104,7 +104,7 @@ async function searchMusic(query) {
     
     try {
         const encodedQuery = encodeURIComponent(query);
-        const apiUrl = `https://rullz-api-sigma.vercel.app/search/play?q=${encodedQuery}`;
+        const apiUrl = `https://kyyokatsurestapi.my.id/search/spotify?q=${encodedQuery}`;
         
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Network response was not ok');
@@ -112,8 +112,12 @@ async function searchMusic(query) {
         const data = await response.json();
         loading.classList.remove('active');
         
-        if (data.status && data.result) {
+        if (data.status && data.result && Array.isArray(data.result)) {
             displayResult(data.result);
+            resultsSection.classList.add('active');
+            showNotification(`Ditemukan ${data.result.length} lagu`);
+        } else if (data.status && data.result) {
+            displayResult([data.result]); // fallback kalau cuma 1 hasil
             resultsSection.classList.add('active');
             showNotification(`Ditemukan: ${data.result.title}`);
         } else {
@@ -126,51 +130,64 @@ async function searchMusic(query) {
     }
 }
 
-function displayResult(result) {
-    resultsSection.innerHTML = `
+function displayResult(results) {
+    resultsSection.innerHTML = results.map(result => `
         <div class="result-card">
             <div class="thumbnail">
-                <img src="${result.imageUrl}" alt="${result.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+                <img src="${result.thumbnail}" alt="${result.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
             </div>
             <div class="result-info">
                 <h3>${result.title}</h3>
                 <div class="result-meta">
                     <div class="meta-item">
                         <i class="fas fa-user"></i>
-                        <span>${result.channel}</span>
+                        <span>${result.artist}</span>
                     </div>
                     <div class="meta-item">
                         <i class="fas fa-clock"></i>
                         <span>${result.duration}</span>
                     </div>
                     <div class="meta-item">
-                        <i class="fas fa-eye"></i>
-                        <span>${result.views.toLocaleString()} views</span>
+                        <i class="fas fa-fire"></i>
+                        <span>Popularitas: ${result.popularity}</span>
                     </div>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-primary play-btn" data-src="${result.mp3}" data-title="${result.title}" data-channel="${result.channel}" data-image="${result.imageUrl}">
+                    <button class="btn btn-primary play-btn" 
+                        data-src="${result.audio}" 
+                        data-title="${result.title}" 
+                        data-channel="${result.artist}" 
+                        data-image="${result.thumbnail}">
                         <i class="fas fa-play"></i> Putar
                     </button>
-                    <button class="btn btn-secondary lyrics-btn" data-title="${result.title}" data-artist="${result.channel}">
+                    <a href="${result.url}" target="_blank" class="btn btn-secondary">
+                        <i class="fab fa-spotify"></i> Spotify
+                    </a>
+                    <button class="btn btn-secondary lyrics-btn" 
+                        data-title="${result.name}" 
+                        data-artist="${result.artist}">
                         <i class="fas fa-scroll"></i> Lirik
                     </button>
                 </div>
             </div>
         </div>
-    `;
+    `).join('');
     
-    document.querySelector('.play-btn').addEventListener('click', function() {
-        playMusic(
-            this.getAttribute('data-src'),
-            this.getAttribute('data-title'),
-            this.getAttribute('data-channel'),
-            this.getAttribute('data-image')
-        );
+    document.querySelectorAll('.play-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            playMusic(
+                this.getAttribute('data-src'),
+                this.getAttribute('data-title'),
+                this.getAttribute('data-channel'),
+                this.getAttribute('data-image')
+            );
+        });
     });
 
-    document.querySelector('.lyrics-btn').addEventListener('click', function() {
-        searchLyrics(this.getAttribute('data-title'), this.getAttribute('data-artist'));
+    document.querySelectorAll('.lyrics-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            searchLyrics(this.getAttribute('data-title'), this.getAttribute('data-artist'));
+        });
     });
 }
 
@@ -179,17 +196,12 @@ async function searchLyrics(title, artist) {
     lyricsSection.classList.add('active');
     
     try {
-        const query = `${artist} ${title}`;
-        const response = await fetch(`https://rullz-api-sigma.vercel.app/search/lyrics?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`);
         if (!response.ok) throw new Error('Lirik tidak ditemukan');
         
         const data = await response.json();
-        if (data.status && data.result && data.result.lyrics) {
-            displayLyrics(data.result.lyrics);
-            showNotification('Lirik berhasil ditemukan');
-        } else {
-            throw new Error('Lirik tidak ditemukan');
-        }
+        displayLyrics(data.lyrics);
+        showNotification('Lirik berhasil ditemukan');
     } catch (err) {
         lyricsContent.innerHTML = '<p>Lirik tidak ditemukan untuk lagu ini.</p>';
     }
