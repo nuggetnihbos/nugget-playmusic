@@ -66,7 +66,7 @@ function handleAudioCanPlay() {
 
 function handleAudioError(e) {
     console.error('Error audio:', e);
-    showError('Error memutar audio. Silakan coba lagu lain.');
+    showError('Error memutar audio. Silakan coba lagi.');
     isPlaying = false;
     updatePlayPauseButton();
 }
@@ -117,7 +117,7 @@ async function searchMusic(query) {
             resultsSection.classList.add('active');
             showNotification(`Ditemukan ${data.result.length} lagu`);
         } else if (data.status && data.result) {
-            displayResult([data.result]); // fallback kalau cuma 1 hasil
+            displayResult([data.result]);
             resultsSection.classList.add('active');
             showNotification(`Ditemukan: ${data.result.title}`);
         } else {
@@ -215,26 +215,28 @@ function displayLyrics(lyrics) {
 }
 
 function playMusic(src, title, channel, image) {
-    if (isPlaying) audio.pause();
+    if (currentTrack && currentTrack.src === src) {
+        if (audio.paused) {
+            audio.play();
+        } else {
+            audio.pause();
+        }
+        return;
+    }
     
     audio.src = src;
-    audio.load();
-    
     playerThumbnail.src = image;
     playerTitle.textContent = title;
     playerChannel.textContent = channel;
     
     currentTrack = { src, title, channel, image };
     initializeAudioEvents();
-    
     playerSection.classList.add('active');
     
-    setTimeout(() => {
-        audio.play().catch(err => {
-            console.error('Play error:', err);
-            showError('Error memutar audio. Silakan coba lagi.');
-        });
-    }, 100);
+    audio.play().catch(err => {
+        console.error('Play error:', err);
+        showError('Error memutar audio. Silakan coba lagi.');
+    });
 }
 
 function updateDuration() {
@@ -350,20 +352,20 @@ playPauseBtn.addEventListener('click', function(e) {
         return;
     }
     
-    if (isPlaying) {
-        audio.pause();
-    } else {
+    if (audio.paused) {
         audio.play().catch(err => {
             console.error('Play error:', err);
             showError('Gagal memutar audio');
         });
+    } else {
+        audio.pause();
     }
 });
 
 prevBtn.addEventListener('click', function() {
     if (!currentTrack) return;
     audio.currentTime = 0;
-    if (!isPlaying) audio.play();
+    if (audio.paused) audio.play();
 });
 
 nextBtn.addEventListener('click', function() {
@@ -422,5 +424,5 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('beforeunload', () => {
-    if (isPlaying) audio.pause();
+    if (!audio.paused) audio.pause();
 });
