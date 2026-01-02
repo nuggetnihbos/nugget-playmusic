@@ -39,7 +39,6 @@ let audioEventsInitialized = false;
 let isDarkTheme = true;
 
 const PLACEHOLDER_IMG = 'https://via.placeholder.com/300x200?text=No+Image';
-
 shareUrl.value = window.location.href;
 
 function toAbsolute(url) {
@@ -108,20 +107,14 @@ async function searchMusic(query) {
     loading.classList.add('active');
     error.classList.remove('active');
     resultsSection.classList.remove('active');
-
     try {
         const encodedQuery = encodeURIComponent(query);
-        const apiUrl = `https://kyyokatsurestapi.my.id/search/spotify?q=${encodedQuery}`;
+        const apiUrl = `https://api.deline.web.id/downloader/ytplay?q=${encodedQuery}`;
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Network response was not ok');
         const data = await response.json();
         loading.classList.remove('active');
-
-        if (data.status && data.result && Array.isArray(data.result)) {
-            displayResult(data.result);
-            resultsSection.classList.add('active');
-            showNotification(`Ditemukan ${data.result.length} lagu`);
-        } else if (data.status && data.result) {
+        if (data.status && data.result) {
             displayResult([data.result]);
             resultsSection.classList.add('active');
             showNotification(`Ditemukan: ${data.result.title}`);
@@ -138,86 +131,71 @@ async function searchMusic(query) {
 function displayResult(results) {
     resultsSection.innerHTML = '';
     results.forEach(result => {
-        const srcAbs = toAbsolute(result.audio || '');
+        const srcAbs = toAbsolute(result.dlink || '');
         const thumb = result.thumbnail || PLACEHOLDER_IMG;
-
         const card = document.createElement('div');
         card.className = 'result-card';
-
         const thumbWrap = document.createElement('div');
         thumbWrap.className = 'thumbnail';
         const img = document.createElement('img');
         img.src = thumb;
         img.alt = result.title || '';
-        img.onerror = function () { this.src = PLACEHOLDER_IMG; };
+        img.onerror = function () {
+            this.src = PLACEHOLDER_IMG;
+        };
         thumbWrap.appendChild(img);
-
         const info = document.createElement('div');
         info.className = 'result-info';
-
         const h3 = document.createElement('h3');
         h3.textContent = result.title || '';
-
         const meta = document.createElement('div');
         meta.className = 'result-meta';
-
         const metaArtist = document.createElement('div');
         metaArtist.className = 'meta-item';
-        metaArtist.innerHTML = `<i class="fas fa-user"></i><span>${result.artist || ''}</span>`;
-
+        metaArtist.innerHTML = `<i class="fas fa-user"></i><span>${result.pick?.quality || ''}</span>`;
         const metaDuration = document.createElement('div');
         metaDuration.className = 'meta-item';
-        metaDuration.innerHTML = `<i class="fas fa-clock"></i><span>${result.duration || '0:00'}</span>`;
-
+        metaDuration.innerHTML = `<i class="fas fa-clock"></i><span>${result.pick?.size || 'N/A'}</span>`;
         const metaPop = document.createElement('div');
         metaPop.className = 'meta-item';
-        metaPop.innerHTML = `<i class="fas fa-fire"></i><span>Popularitas: ${result.popularity || 'N/A'}</span>`;
-
+        metaPop.innerHTML = `<i class="fas fa-fire"></i><span>${result.pick?.ext || 'N/A'}</span>`;
         meta.appendChild(metaArtist);
         meta.appendChild(metaDuration);
         meta.appendChild(metaPop);
-
         const actions = document.createElement('div');
         actions.className = 'actions';
-
         const playBtn = document.createElement('button');
         playBtn.className = 'btn btn-primary play-btn';
         playBtn.setAttribute('data-src', srcAbs);
         playBtn.setAttribute('data-title', result.title || '');
-        playBtn.setAttribute('data-channel', result.artist || '');
+        playBtn.setAttribute('data-channel', result.pick?.quality || '');
         playBtn.setAttribute('data-image', thumb);
         playBtn.innerHTML = `<i class="fas fa-play"></i> Putar`;
         playBtn.addEventListener('click', function () {
             playMusic(this.getAttribute('data-src'), this.getAttribute('data-title'), this.getAttribute('data-channel'), this.getAttribute('data-image'));
         });
-
         const spotifyLink = document.createElement('a');
         spotifyLink.className = 'btn btn-secondary';
         spotifyLink.href = result.url || '#';
         spotifyLink.target = '_blank';
         spotifyLink.rel = 'noopener noreferrer';
-        spotifyLink.innerHTML = `<i class="fab fa-spotify"></i> Spotify`;
-
+        spotifyLink.innerHTML = `<i class="fab fa-youtube"></i> YouTube`;
         const lyricsBtn = document.createElement('button');
         lyricsBtn.className = 'btn btn-secondary lyrics-btn';
-        lyricsBtn.setAttribute('data-title', result.name || result.title || '');
-        lyricsBtn.setAttribute('data-artist', result.artist || '');
+        lyricsBtn.setAttribute('data-title', result.title || '');
+        lyricsBtn.setAttribute('data-artist', '');
         lyricsBtn.innerHTML = `<i class="fas fa-scroll"></i> Lirik`;
         lyricsBtn.addEventListener('click', function () {
             searchLyrics(this.getAttribute('data-title'), this.getAttribute('data-artist'));
         });
-
         actions.appendChild(playBtn);
         actions.appendChild(spotifyLink);
         actions.appendChild(lyricsBtn);
-
         info.appendChild(h3);
         info.appendChild(meta);
         info.appendChild(actions);
-
         card.appendChild(thumbWrap);
         card.appendChild(info);
-
         resultsSection.appendChild(card);
     });
 }
@@ -225,7 +203,6 @@ function displayResult(results) {
 async function searchLyrics(title, artist) {
     lyricsContent.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Mencari lirik...</p>';
     lyricsSection.classList.add('active');
-
     try {
         const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`);
         if (!response.ok) throw new Error('Lirik tidak ditemukan');
@@ -252,7 +229,6 @@ function playMusic(src, title, channel, image) {
         showError('Sumber audio tidak valid');
         return;
     }
-
     if (currentTrack && currentTrack.src === srcAbs) {
         if (audio.paused) {
             audio.play().catch(err => {
@@ -264,15 +240,18 @@ function playMusic(src, title, channel, image) {
         }
         return;
     }
-
-    currentTrack = { src: srcAbs, title: title || '', channel: channel || '', image: image || PLACEHOLDER_IMG };
+    currentTrack = {
+        src: srcAbs,
+        title: title || '',
+        channel: channel || '',
+        image: image || PLACEHOLDER_IMG
+    };
     audio.src = srcAbs;
     playerThumbnail.src = currentTrack.image;
     playerTitle.textContent = currentTrack.title;
     playerChannel.textContent = currentTrack.channel;
     initializeAudioEvents();
     playerSection.classList.add('active');
-
     audio.play().catch(err => {
         console.error('Play error:', err);
         showError('Error memutar audio. Silakan coba lagi.');
@@ -303,7 +282,6 @@ function updateProgress() {
         const progressPercent = (audio.currentTime / audio.duration) * 100;
         progress.style.width = `${progressPercent}%`;
         currentTimeEl.textContent = formatTime(audio.currentTime);
-
         const lyricsLines = document.querySelectorAll('.lyrics-line');
         if (lyricsLines.length > 0) {
             const idx = Math.floor((audio.currentTime / audio.duration) * lyricsLines.length);
@@ -348,11 +326,15 @@ copyUrl.addEventListener('click', () => {
         showError('Gagal menyalin URL');
     });
 });
+
 shareWhatsApp.addEventListener('click', () => shareWebsite('whatsapp'));
 shareFacebook.addEventListener('click', () => shareWebsite('facebook'));
 shareTwitter.addEventListener('click', () => shareWebsite('twitter'));
 shareTelegram.addEventListener('click', () => shareWebsite('telegram'));
-shareModal.addEventListener('click', (e) => { if (e.target === shareModal) shareModal.classList.remove('active'); });
+
+shareModal.addEventListener('click', (e) => {
+    if (e.target === shareModal) shareModal.classList.remove('active');
+});
 
 playPauseBtn.addEventListener('click', function (e) {
     e.stopPropagation();
